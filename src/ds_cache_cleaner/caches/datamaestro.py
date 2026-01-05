@@ -3,8 +3,11 @@
 import os
 from pathlib import Path
 
-from ds_cache_cleaner.caches.base import CacheEntry, CacheHandler
-from ds_cache_cleaner.utils import get_directory_size, get_last_access_time
+from ds_cache_cleaner.caches.base import (
+    CacheEntry,
+    CacheHandler,
+)
+from ds_cache_cleaner.utils import SizeState, get_last_access_time
 
 
 def _get_datamaestro_home() -> Path:
@@ -45,7 +48,11 @@ class DatamaestroDataHandler(CacheHandler):
         return _get_datamaestro_home() / "data"
 
     def _entries_from_filesystem(self) -> list[CacheEntry]:
-        """Get data entries, walking the dataset structure."""
+        """Get data entries, walking the dataset structure.
+
+        Entries are created with PENDING size state. Use ThreadSizeComputer
+        to compute sizes asynchronously.
+        """
         if not self.exists:
             return []
 
@@ -67,7 +74,6 @@ class DatamaestroDataHandler(CacheHandler):
                         # Check if it contains actual data files
                         has_files = any(f.is_file() for f in dataset.iterdir())
                         if has_files:
-                            size = get_directory_size(dataset)
                             last_access = get_last_access_time(dataset)
                             # Create a readable name from the path
                             rel_path = dataset.relative_to(self.cache_path)
@@ -75,9 +81,10 @@ class DatamaestroDataHandler(CacheHandler):
                                 CacheEntry(
                                     name=str(rel_path),
                                     path=dataset,
-                                    size=size,
+                                    size=0,
                                     handler_name=self.name,
                                     last_access=last_access,
+                                    size_state=SizeState.PENDING,
                                 )
                             )
 
@@ -87,15 +94,15 @@ class DatamaestroDataHandler(CacheHandler):
                 if item.name == "ds-cache-cleaner":
                     continue
                 if item.is_dir():
-                    size = get_directory_size(item)
                     last_access = get_last_access_time(item)
                     entries.append(
                         CacheEntry(
                             name=item.name,
                             path=item,
-                            size=size,
+                            size=0,
                             handler_name=self.name,
                             last_access=last_access,
+                            size_state=SizeState.PENDING,
                         )
                     )
 

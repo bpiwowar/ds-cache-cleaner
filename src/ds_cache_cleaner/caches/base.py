@@ -11,8 +11,8 @@ from ds_cache_cleaner.metadata import (
     PartInfo,
 )
 from ds_cache_cleaner.utils import (
+    SizeState,
     format_size,
-    get_directory_size,
     get_last_access_time,
 )
 
@@ -32,11 +32,20 @@ class CacheEntry:
     metadata: dict = field(default_factory=dict)
     # Whether this entry came from metadata (vs filesystem scan)
     from_metadata: bool = False
+    # Size computation state (updated by ThreadSizeComputer)
+    size_state: SizeState = SizeState.PENDING
 
     @property
     def formatted_size(self) -> str:
-        """Return human-readable size."""
-        return format_size(self.size)
+        """Return human-readable size with state indicator."""
+        if self.size_state == SizeState.PENDING:
+            return "⌛"
+        elif self.size_state == SizeState.COMPUTING:
+            return "⚙️"
+        elif self.size_state == SizeState.ERROR:
+            return "⚠"
+        else:
+            return format_size(self.size)
 
     @property
     def formatted_last_access(self) -> str:
@@ -92,16 +101,6 @@ class CacheHandler(ABC):
         """Check if metadata exists for this cache."""
         return self.metadata_manager.exists
 
-    @property
-    def total_size(self) -> int:
-        """Get total size of the cache in bytes."""
-        return get_directory_size(self.cache_path)
-
-    @property
-    def formatted_size(self) -> str:
-        """Get human-readable total size."""
-        return format_size(self.total_size)
-
     def get_parts(self) -> list[PartInfo]:
         """Get the parts defined in metadata, or a default list."""
         if self.has_metadata:
@@ -126,17 +125,13 @@ class CacheHandler(ABC):
         for part_name, part_data in all_parts.items():
             for entry_meta in part_data.entries:
                 entry_path = self.cache_path / entry_meta.path
-                # Use metadata size or calculate if not available
+                # Use metadata size if available, otherwise mark as pending
                 if entry_meta.size is not None:
                     size = entry_meta.size
-                elif entry_path.exists():
-                    size = (
-                        get_directory_size(entry_path)
-                        if entry_path.is_dir()
-                        else entry_path.stat().st_size
-                    )
+                    size_state = SizeState.COMPUTED
                 else:
                     size = 0
+                    size_state = SizeState.PENDING
 
                 entries.append(
                     CacheEntry(
@@ -150,13 +145,18 @@ class CacheHandler(ABC):
                         created=entry_meta.created,
                         metadata=entry_meta.metadata,
                         from_metadata=True,
+                        size_state=size_state,
                     )
                 )
 
         return entries if entries else None
 
     def _entries_from_filesystem(self) -> list[CacheEntry]:
-        """Get entries by scanning the filesystem (fallback)."""
+        """Get entries by scanning the filesystem (fallback).
+
+        Entries are created with PENDING size state. Use ThreadSizeComputer
+        to compute sizes asynchronously.
+        """
         if not self.exists:
             return []
 
@@ -166,16 +166,16 @@ class CacheHandler(ABC):
             if item.name == "ds-cache-cleaner":
                 continue
 
-            size = get_directory_size(item) if item.is_dir() else item.stat().st_size
             last_access = get_last_access_time(item)
             entries.append(
                 CacheEntry(
                     name=item.name,
                     path=item,
-                    size=size,
+                    size=0,
                     handler_name=self.name,
                     last_access=last_access,
                     from_metadata=False,
+                    size_state=SizeState.PENDING,
                 )
             )
         return entries
@@ -185,15 +185,17 @@ class CacheHandler(ABC):
 
         First tries to get entries from metadata. If no metadata exists,
         falls back to scanning the filesystem.
+
+        Entries from filesystem scan will have PENDING size state.
+        Use ThreadSizeComputer to compute sizes asynchronously.
         """
         # Try metadata first
         entries = self._entries_from_metadata()
         if entries is not None:
-            return sorted(entries, key=lambda e: e.size, reverse=True)
+            return entries
 
         # Fallback to filesystem scan
-        entries = self._entries_from_filesystem()
-        return sorted(entries, key=lambda e: e.size, reverse=True)
+        return self._entries_from_filesystem()
 
     def delete_entry(self, entry: CacheEntry) -> bool:
         """Delete a cache entry and update metadata if applicable.

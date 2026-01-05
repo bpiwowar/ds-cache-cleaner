@@ -1,12 +1,14 @@
 """CLI interface for ds-cache-cleaner."""
 
+import logging
+
 import click
 from rich.console import Console
 from rich.table import Table
 
 from ds_cache_cleaner import __version__
 from ds_cache_cleaner.caches import CacheHandler, get_all_handlers
-from ds_cache_cleaner.utils import format_size
+from ds_cache_cleaner.utils import format_size, get_directory_size
 
 console = Console()
 
@@ -43,13 +45,13 @@ def list(show_all: bool) -> None:
     total_size = 0
     for handler in handlers:
         if handler.exists or show_all:
-            size = handler.total_size
+            size = get_directory_size(handler.cache_path) if handler.exists else 0
             total_size += size
-            entries = handler.get_entries()
+            entries = handler.get_entries() if handler.exists else []
             table.add_row(
                 handler.name,
                 str(handler.cache_path),
-                handler.formatted_size if handler.exists else "-",
+                format_size(size) if handler.exists else "-",
                 str(len(entries)) if handler.exists else "-",
             )
 
@@ -91,10 +93,10 @@ def clean(cache_name: str | None, clean_all: bool, dry_run: bool) -> None:
     total_size = 0
     for handler in handlers:
         if handler.exists:
-            size = handler.total_size
+            size = get_directory_size(handler.cache_path)
             total_size += size
             entries = handler.get_entries()
-            table.add_row(handler.name, handler.formatted_size, str(len(entries)))
+            table.add_row(handler.name, format_size(size), str(len(entries)))
 
     console.print(table)
     console.print(f"\n[bold]Total to clean:[/bold] {format_size(total_size)}")
@@ -144,7 +146,8 @@ def show(cache_name: str | None) -> None:
         if not entries:
             continue
 
-        table = Table(title=f"{handler.name} ({handler.formatted_size})")
+        size = get_directory_size(handler.cache_path)
+        table = Table(title=f"{handler.name} ({format_size(size)})")
         table.add_column("Name", style="cyan")
         table.add_column("Size", justify="right", style="green")
         table.add_column("Last Access", justify="right", style="dim")
@@ -160,6 +163,8 @@ def show(cache_name: str | None) -> None:
 def tui() -> None:
     """Launch the interactive TUI."""
     from ds_cache_cleaner.tui import CacheCleanerApp
+
+    logging.basicConfig(level=logging.DEBUG)
 
     app = CacheCleanerApp()
     app.run()

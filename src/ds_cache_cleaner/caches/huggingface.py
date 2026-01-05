@@ -3,8 +3,11 @@
 import os
 from pathlib import Path
 
-from ds_cache_cleaner.caches.base import CacheEntry, CacheHandler
-from ds_cache_cleaner.utils import get_directory_size, get_last_access_time
+from ds_cache_cleaner.caches.base import (
+    CacheEntry,
+    CacheHandler,
+)
+from ds_cache_cleaner.utils import SizeState, get_last_access_time
 
 
 class HuggingFaceHubBaseHandler(CacheHandler):
@@ -24,7 +27,11 @@ class HuggingFaceHubBaseHandler(CacheHandler):
         return Path.home() / ".cache" / "huggingface" / "hub"
 
     def _entries_from_filesystem(self) -> list[CacheEntry]:
-        """Get cache entries by scanning filesystem for this prefix."""
+        """Get cache entries by scanning filesystem for this prefix.
+
+        Entries are created with PENDING size state. Use ThreadSizeComputer
+        to compute sizes asynchronously.
+        """
         if not self.exists:
             return []
 
@@ -36,15 +43,15 @@ class HuggingFaceHubBaseHandler(CacheHandler):
                 # Parse the name: PREFIX--org--name -> org/name
                 display_name = "/".join(name.split("--", 1))
 
-                size = get_directory_size(item)
                 last_access = get_last_access_time(item)
                 entries.append(
                     CacheEntry(
                         name=display_name,
                         path=item,
-                        size=size,
+                        size=0,
                         handler_name=self.name,
                         last_access=last_access,
+                        size_state=SizeState.PENDING,
                     )
                 )
 
