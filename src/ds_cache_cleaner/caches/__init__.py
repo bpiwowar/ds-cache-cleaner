@@ -6,12 +6,16 @@ from ds_cache_cleaner.caches.datamaestro import (
     DatamaestroDataHandler,
 )
 from ds_cache_cleaner.caches.datasets import DatasetsCacheHandler
-from ds_cache_cleaner.caches.huggingface import HuggingFaceCacheHandler
+from ds_cache_cleaner.caches.huggingface import (
+    HuggingFaceDatasetsHandler,
+    HuggingFaceModelsHandler,
+)
 from ds_cache_cleaner.caches.ir_datasets import IrDatasetsCacheHandler
 from ds_cache_cleaner.caches.transformers import TransformersCacheHandler
 
 ALL_HANDLERS: list[type[CacheHandler]] = [
-    HuggingFaceCacheHandler,
+    HuggingFaceModelsHandler,
+    HuggingFaceDatasetsHandler,
     TransformersCacheHandler,
     DatasetsCacheHandler,
     IrDatasetsCacheHandler,
@@ -28,7 +32,8 @@ def get_all_handlers() -> list[CacheHandler]:
 __all__ = [
     "CacheEntry",
     "CacheHandler",
-    "HuggingFaceCacheHandler",
+    "HuggingFaceModelsHandler",
+    "HuggingFaceDatasetsHandler",
     "TransformersCacheHandler",
     "DatasetsCacheHandler",
     "IrDatasetsCacheHandler",

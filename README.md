@@ -4,7 +4,8 @@ Clean up cached data from ML/data science libraries.
 
 ## Supported Caches
 
-- **HuggingFace Hub** - `~/.cache/huggingface/hub`
+- **HuggingFace Models** - `~/.cache/huggingface/hub` (models)
+- **HuggingFace Datasets (Hub)** - `~/.cache/huggingface/hub` (datasets)
 - **Transformers** - `~/.cache/huggingface/transformers`
 - **HF Datasets** - `~/.cache/huggingface/datasets`
 - **ir_datasets** - `~/.ir_datasets`

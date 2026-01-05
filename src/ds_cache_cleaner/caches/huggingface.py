@@ -1,4 +1,4 @@
-"""HuggingFace Hub cache handler."""
+"""HuggingFace Hub cache handlers."""
 
 import os
 from pathlib import Path
@@ -7,15 +7,13 @@ from ds_cache_cleaner.caches.base import CacheEntry, CacheHandler
 from ds_cache_cleaner.utils import get_directory_size, get_last_access_time
 
 
-class HuggingFaceCacheHandler(CacheHandler):
-    """Handler for HuggingFace Hub cache (~/.cache/huggingface/hub)."""
+class HuggingFaceHubBaseHandler(CacheHandler):
+    """Base handler for HuggingFace Hub cache."""
+
+    prefix: str = ""  # Override in subclasses
 
     def __init__(self) -> None:
         super().__init__()
-
-    @property
-    def name(self) -> str:
-        return "HuggingFace Hub"
 
     @property
     def cache_path(self) -> Path:
@@ -26,24 +24,21 @@ class HuggingFaceCacheHandler(CacheHandler):
         return Path.home() / ".cache" / "huggingface" / "hub"
 
     def _entries_from_filesystem(self) -> list[CacheEntry]:
-        """Get cache entries by scanning filesystem, grouping by model/dataset."""
+        """Get cache entries by scanning filesystem for this prefix."""
         if not self.exists:
             return []
 
         entries = []
-        # HF hub cache structure: models--org--name or datasets--org--name
         for item in self.cache_path.iterdir():
             # Skip metadata directory
             if item.name == "ds-cache-cleaner":
                 continue
 
-            if item.is_dir() and (
-                item.name.startswith("models--") or item.name.startswith("datasets--")
-            ):
+            if item.is_dir() and item.name.startswith(self.prefix):
                 # Parse the name: models--org--name -> org/name
                 parts = item.name.split("--", 2)
                 if len(parts) >= 3:
-                    display_name = f"{parts[0]}: {parts[1]}/{parts[2]}"
+                    display_name = f"{parts[1]}/{parts[2]}"
                 else:
                     display_name = item.name
 
@@ -58,19 +53,25 @@ class HuggingFaceCacheHandler(CacheHandler):
                         last_access=last_access,
                     )
                 )
-            elif item.is_dir():
-                # Other directories (like .locks)
-                size = get_directory_size(item)
-                if size > 0:
-                    last_access = get_last_access_time(item)
-                    entries.append(
-                        CacheEntry(
-                            name=item.name,
-                            path=item,
-                            size=size,
-                            handler_name=self.name,
-                            last_access=last_access,
-                        )
-                    )
 
         return entries
+
+
+class HuggingFaceModelsHandler(HuggingFaceHubBaseHandler):
+    """Handler for HuggingFace Hub models cache (~/.cache/huggingface/hub/models--)."""
+
+    prefix = "models--"
+
+    @property
+    def name(self) -> str:
+        return "HuggingFace Models"
+
+
+class HuggingFaceDatasetsHandler(HuggingFaceHubBaseHandler):
+    """Handler for HuggingFace Hub datasets cache (~/.cache/huggingface/hub/datasets--)."""
+
+    prefix = "datasets--"
+
+    @property
+    def name(self) -> str:
+        return "HuggingFace Datasets (Hub)"
