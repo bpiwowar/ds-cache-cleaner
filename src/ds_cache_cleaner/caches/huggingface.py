@@ -29,18 +29,12 @@ class HuggingFaceHubBaseHandler(CacheHandler):
             return []
 
         entries = []
-        for item in self.cache_path.iterdir():
+        for item in self.cache_path.glob(f"{self.prefix}*"):
             # Skip metadata directory
-            if item.name == "ds-cache-cleaner":
-                continue
-
-            if item.is_dir() and item.name.startswith(self.prefix):
-                # Parse the name: models--org--name -> org/name
-                parts = item.name.split("--", 2)
-                if len(parts) >= 3:
-                    display_name = f"{parts[1]}/{parts[2]}"
-                else:
-                    display_name = item.name
+            name = item.name[len(self.prefix) :]
+            if item.is_dir():
+                # Parse the name: PREFIX--org--name -> org/name
+                display_name = "/".join(name.split("--", 1))
 
                 size = get_directory_size(item)
                 last_access = get_last_access_time(item)
@@ -64,7 +58,7 @@ class HuggingFaceModelsHandler(HuggingFaceHubBaseHandler):
 
     @property
     def name(self) -> str:
-        return "HuggingFace Models"
+        return "HuggingFace Models (Hub)"
 
 
 class HuggingFaceDatasetsHandler(HuggingFaceHubBaseHandler):
