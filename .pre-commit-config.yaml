@@ -24,3 +24,9 @@ repos:
           - textual>=0.40
           - rich>=13.0
         args: [--ignore-missing-imports]
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.6.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
