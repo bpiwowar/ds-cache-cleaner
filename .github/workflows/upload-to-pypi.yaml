@@ -1,0 +1,37 @@
+# This workflow will upload a Python Package to PyPI using trusted publishing
+# For more information see: https://docs.pypi.org/trusted-publishers/
+
+name: Upload Python Package
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  deploy:
+    permissions:
+      contents: write
+      id-token: write  # Required for PyPI trusted publishing
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed for hatch-vcs to determine version
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install hatch
+        run: |
+          python -m pip install --upgrade pip
+          pip install hatch
+
+      - name: Build python package
+        run: |
+          hatch build
+
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
