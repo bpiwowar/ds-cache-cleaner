@@ -8,6 +8,14 @@ repos:
       - id: check-added-large-files
       - id: check-toml
 
+  - repo: local
+    hooks:
+      - id: no-todo-fixme
+        name: check for TODO/FIXME comments
+        entry: bash -c 'grep -rn "TODO:\|FIXME:" "$@" && exit 1 || exit 0' --
+        language: system
+        files: \.py$
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.0
     hooks:
