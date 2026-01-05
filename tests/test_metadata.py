@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
+
 from ds_cache_cleaner.metadata import (
     CacheInfo,
     CacheRegistry,
